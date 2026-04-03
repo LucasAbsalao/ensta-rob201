@@ -12,8 +12,26 @@ def reactive_obst_avoid(lidar):
     # TODO for TP1
 
     laser_dist = lidar.get_sensor_values()
-    speed = 0.0
+    angles = lidar.get_ray_angles()
+
+    # print("laser: ")
+    # print(laser_dist)
+    # print("angles: ")
+    # print(angles)
+
+    speed = 1.0
     rotation_speed = 0.0
+
+    indexes = []
+    for i in range(len(angles)):
+        if angles[i] < 0.2 and angles[i] > -0.2:
+            indexes.append(i)
+
+    for i in indexes:
+        if laser_dist[i] < 100.0:
+            rotation_speed = np.random.uniform(0, 1)
+    
+    print(rotation_speed)
 
     command = {"forward": speed,
                "rotation": rotation_speed}
@@ -32,8 +50,64 @@ def potential_field_control(lidar, current_pose, goal_pose):
     on initial pose, x forward, y on left)
     """
     # TODO for TP2
+    dlim = 40
+    anglelim = np.pi*3/4
 
-    command = {"forward": 0,
-               "rotation": 0}
+    k_attraction = 1.0
+    k_repulsion  = 50000
+    d_safe = 40.0
+
+    # print("\ngoal_pose: ", goal_pose)
+    # print("current_pose: ", current_pose)
+
+    #Calculating the distance between the current pose and the goal
+    diff = goal_pose[:2] - current_pose[:2]
+    distance_absolut = np.linalg.norm(diff)
+
+    # print("\ndistance_absolut: ", distance_absolut)
+
+    # Calculating attraction gradient 
+    if distance_absolut > dlim:
+        gradient = k_attraction*diff/distance_absolut
+    else:
+        gradient = k_attraction*diff/dlim
+
+    # print("\ngradients: ", gradient)
+
+    #Calculating repulsion gradient
+    closest_obstacle_index = np.argmin(lidar.get_sensor_values())
+    closest_distance = lidar.get_sensor_values()[closest_obstacle_index]
+
+    closest_angle = lidar.get_ray_angles()[closest_obstacle_index]
+    angle_global = closest_angle + current_pose[2]
+
+
+    negative_gradient = 0
+    if closest_distance <= d_safe:
+        x_obstacle = - np.cos(angle_global) * closest_distance
+        y_obstacle = - np.sin(angle_global) * closest_distance
+        diff_repulsion = np.array([x_obstacle, y_obstacle], dtype=np.float64)
+        negative_gradient = k_repulsion/(closest_distance**3) * ((1/closest_distance) - (1/d_safe)) * diff_repulsion
+
+    # print("negative gradient ", negative_gradient)
+    gradient = gradient + negative_gradient
+
+    #Calculating rotation speed based in the gradient
+    rotation_speed = np.arctan2(gradient[1],gradient[0]) - current_pose[2]
+    rotation_speed = (rotation_speed + np.pi) % (2 * np.pi) - np.pi #Normalizing
+
+    #Setting new speed. If the curve is too strict, reduce speed through k_vitesse
+    k_vitesse = anglelim/abs(rotation_speed) if abs(rotation_speed)>anglelim else 1
+    forward_speed = 0.5 * np.linalg.norm(gradient) * k_vitesse
+
+    #Clip dpeed and rotations
+    forward_speed = np.clip(forward_speed, -1.0, 1.0)
+    rotation_speed = np.clip(rotation_speed, -1.0 ,1.0)
+
+    # print("\nforward_speed: ", forward_speed)
+    # print("rotation_speed: ", rotation_speed)
+
+    command = {"forward": forward_speed,
+               "rotation": rotation_speed}
 
     return command

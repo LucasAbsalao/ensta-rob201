@@ -58,6 +58,37 @@ class TinySlam:
         pose : [x, y, theta] nparray, corrected pose in world coordinates
         """
         # TODO for TP3
+        values = lidar.get_sensor_values() + np.random.normal(0, 0.5, size=len(lidar.get_sensor_values()))
+        x = np.cos(lidar.get_ray_angles()+pose[2]) * values + pose[0]
+        y = np.sin(lidar.get_ray_angles()+pose[2]) * values + pose[1]
+
+        for i in range(len(x)):
+            self.grid.add_value_along_line(pose[0], pose[1], x[i], y[i], -0.95)
+        self.grid.add_map_points(x, y, 4)
+
+
+
+        np.clip(self.grid.occupancy_map, -40, 40, out=self.grid.occupancy_map)
+
+    def update_map_gaussian(self, lidar, pose):
+        """
+        Bayesian map update with new observation
+        lidar : placebot object with lidar data
+        pose : [x, y, theta] nparray, corrected pose in world coordinates
+        """
+        # TODO for TP3
+        values = lidar.get_sensor_values() + np.random.normal(0, 0.5, size=len(lidar.get_sensor_values()))
+        x = np.cos(lidar.get_ray_angles()+pose[2]) * values + pose[0]
+        y = np.sin(lidar.get_ray_angles()+pose[2]) * values + pose[1]
+
+        for i in range(len(x)):
+            self.grid.add_value_along_line_gaussian(pose[0], pose[1], x[i], y[i], -0.95, 0, 2, 4)
+
+
+
+
+        np.clip(self.grid.occupancy_map, -40, 40, out=self.grid.occupancy_map)
+        
 
     def compute(self):
         """ Useless function, just for the exercise on using the profiler """
@@ -72,3 +103,7 @@ class TinySlam:
             pt_x = ranges[i] * np.cos(ray_angles[i])
             pt_y = ranges[i] * np.sin(ray_angles[i])
             points.append([pt_x, pt_y])
+
+        # pt_x = ranges * np.cos(ray_angles)
+        # pt_y = ranges * np.sin(ray_angles)
+        # points = np.vstack((pt_x, pt_y))
