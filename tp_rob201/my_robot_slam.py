@@ -28,6 +28,10 @@ class MyRobotSlam(RobotAbstract):
 
         # step counter to deal with init and display
         self.counter = 0
+        self.best_score = 0
+
+        # Counter to threshold
+        self.counter_threshold = 0
 
         # Init SLAM object
         # Here we cheat to get an occupancy grid size that's not too large, by using the
@@ -46,14 +50,38 @@ class MyRobotSlam(RobotAbstract):
         # storage for pose after localization
         self.corrected_pose = np.array([0, 0, 0])
 
+        #Safe distance to avoid obstacles
+        self.d_safe = 50.0
+
+        #Goal
+        self.goal = np.array([-450,-450,0])
+
     def control(self):
         """
         Main control function executed at each time step
         """
         pose = self.odometer_values()
 
-        #self.tiny_slam.update_map(self.lidar(), pose)
-        self.tiny_slam.update_map_gaussian(self.lidar(), pose)
+        if self.counter>=30:
+            score = self.tiny_slam.localise(self.lidar(), pose)
+            #print("Score: ", score)
+            if score > self.best_score or self.counter_threshold > 40:
+                self.best_score = score 
+            
+            threshold_score = 3000
+            #print("Threshold: ", threshold_score)
+            
+            if score>threshold_score:
+                self.corrected_pose = self.tiny_slam.get_corrected_pose(pose)
+                self.tiny_slam.update_map_offset(self.lidar(), self.corrected_pose)
+                self.counter_threshold = 0
+            else:
+                self.counter_threshold += 1
+        else:
+            self.counter+=1
+            self.corrected_pose = self.tiny_slam.get_corrected_pose(pose)
+            self.tiny_slam.update_map_offset(self.lidar(), self.corrected_pose)
+
 
         return self.control_tp2()
 
@@ -73,15 +101,46 @@ class MyRobotSlam(RobotAbstract):
         Control function for TP2
         Main control function with full SLAM, random exploration and path planning
         """
-        pose = self.odometer_values()
-        goal = [-500,0,0]
+        pose = self.corrected_pose
 
-        self.occupancy_grid.display_cv(pose, goal)
+        self.occupancy_grid.display_cv(pose, self.goal)
 
-        # print("--------------------------------------------------")
-        # print("\npose: ", pose)
+        if(self.arrived_at_goal(pose, self.goal)):
+            self.goal = self.new_goal()
+
+        #print("Pose: ", pose, "| Goal: ", self.goal)
 
         # Compute new command speed to perform obstacle avoidance
-        command = potential_field_control(self.lidar(), pose, goal)
+        command = potential_field_control(lidar = self.lidar(), current_pose = pose, goal_pose = self.goal, d_safe = self.d_safe)
 
         return command
+    
+    def arrived_at_goal(self, pose, goal):
+        distance = np.linalg.norm(pose[:2] - goal[:2])
+        return distance < 10
+
+
+    def new_goal(self):
+        laser_dist = self.lidar().get_sensor_values()
+        laser_angles = self.lidar().get_ray_angles()
+
+        laser_dist_prob = laser_dist/np.sum(laser_dist)
+
+        new_direction = np.random.choice(len(laser_dist), 1, p = laser_dist_prob)
+
+        print("New direction: ", new_direction, laser_angles[new_direction])
+
+        #5.0 is a margin to avoid putting a goal in a coordinate very close to the safe distance from an obstacle
+        distance_to_goal = np.random.uniform(0, max(laser_dist[new_direction] - self.d_safe - 5.0, 0)) 
+
+        x_world = distance_to_goal * np.sin(laser_angles[new_direction])
+        y_world = distance_to_goal * np.sin(laser_angles[new_direction])
+
+        x_coord = x_world.squeeze()
+        y_coord = y_world.squeeze()
+
+        return np.array([self.corrected_pose[0] + x_coord, self.corrected_pose[1] + y_coord, 0])
+
+
+
+        

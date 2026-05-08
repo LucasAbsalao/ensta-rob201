@@ -116,7 +116,7 @@ class OccupancyGrid:
         # add value to the points
         self.occupancy_map[points[0], points[1]] += val
 
-    def add_value_along_line_gaussian(self, x_0: float, y_0: float, x_1: float, y_1: float, val, mean: float, sigma: float, val_wall:float):
+    def add_value_along_line_offset(self, x_0: float, y_0: float, x_1: float, y_1: float, val, val_wall:float, offset:int = 5, mean: float=0, sigma: float = 0.1):
         """
         Add a value to a line of points using Bresenham algorithm, input in world coordinates
         x_0, y_0 : starting point coordinates in m
@@ -124,7 +124,7 @@ class OccupancyGrid:
         val : value to add to each cell of the line
         """
 
-        # convert to pixels
+        # convert to pixel
         x_start, y_start = self.conv_world_to_map(x_0, y_0)
         x_end, y_end = self.conv_world_to_map(x_1, y_1)
 
@@ -133,7 +133,7 @@ class OccupancyGrid:
 
         if x_end < 0 or x_end >= self.x_max_map or y_end < 0 or y_end >= self.y_max_map:
             return
-
+        check=False
         # Bresenham line drawing
         d_x = x_end - x_start
         d_y = y_end - y_start
@@ -145,6 +145,11 @@ class OccupancyGrid:
         if x_start > x_end:
             x_start, x_end = x_end, x_start
             y_start, y_end = y_end, y_start
+            check=True
+        if offset>0:
+            a = (y_end-y_start)/(x_end-x_start)
+            x_end = x_end + offset//2
+            y_end = y_end + a*offset//2
         d_x = x_end - x_start  # recalculate differentials
         d_y = y_end - y_start  # recalculate differentials
         error = int(d_x / 2.0)  # calculate error
@@ -159,13 +164,18 @@ class OccupancyGrid:
             if error < 0:
                 y += y_step
                 error += d_x
-
-        rand = np.random.normal(loc = 0, scale = 2, size=(7,2)) * val_wall
-        points = np.concatenate((points[:-3,:], rand), axis=0)
         points = np.array(points).T
 
         # add value to the points
-        self.occupancy_map[points[0], points[1]] += val
+        if check and offset>0:
+            self.occupancy_map[points[0,offset:], points[1,offset:]] += val
+            self.occupancy_map[points[0,:offset], points[1,:offset]] += val_wall
+        elif not check and offset>0:
+            self.occupancy_map[points[0,:-offset], points[1,:-offset]] += val
+            self.occupancy_map[points[0,-offset:], points[1,-offset:]] += val_wall
+        else:
+            self.occupancy_map[points[0], points[1]] += val
+            
 
     def add_map_points(self, points_x, points_y, val):
         """

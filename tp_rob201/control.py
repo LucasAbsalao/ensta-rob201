@@ -39,7 +39,7 @@ def reactive_obst_avoid(lidar):
     return command
 
 
-def potential_field_control(lidar, current_pose, goal_pose):
+def potential_field_control(lidar, current_pose, goal_pose, d_safe = 50.0):
     """
     Control using potential field for goal reaching and obstacle avoidance
     lidar : placebot object with lidar data
@@ -55,7 +55,6 @@ def potential_field_control(lidar, current_pose, goal_pose):
 
     k_attraction = 1.0
     k_repulsion  = 50000
-    d_safe = 40.0
 
     # print("\ngoal_pose: ", goal_pose)
     # print("current_pose: ", current_pose)
@@ -98,9 +97,9 @@ def potential_field_control(lidar, current_pose, goal_pose):
 
     #Setting new speed. If the curve is too strict, reduce speed through k_vitesse
     k_vitesse = anglelim/abs(rotation_speed) if abs(rotation_speed)>anglelim else 1
-    forward_speed = 0.5 * np.linalg.norm(gradient) * k_vitesse
+    forward_speed = 0.4 * np.linalg.norm(gradient) * k_vitesse
 
-    #Clip dpeed and rotations
+    #Clip speed and rotations
     forward_speed = np.clip(forward_speed, -1.0, 1.0)
     rotation_speed = np.clip(rotation_speed, -1.0 ,1.0)
 
