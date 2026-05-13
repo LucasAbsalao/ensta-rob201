@@ -134,7 +134,7 @@ class MyRobotSlam(RobotAbstract):
         #EXPLORING MODE
         if self.exploring:
             pose = self.corrected_pose
-
+            
             if(self.arrived_at_goal(pose, self.goal)):
                 if self.goal_count >= 5:
                     self.goal = np.array([0,0,0])
