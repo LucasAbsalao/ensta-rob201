@@ -154,8 +154,8 @@ class TinySlam:
 
         safe_distances = np.minimum(distances, lidar.max_range)
 
-        x = np.cos(angles + pose[2]) * distances + pose[0]
-        y = np.sin(angles + pose[2]) * distances + pose[1]
+        x = np.cos(angles + pose[2]) * safe_distances + pose[0]
+        y = np.sin(angles + pose[2]) * safe_distances + pose[1]
 
         for i in range(len(x)):
             if idx[i]:
@@ -164,7 +164,7 @@ class TinySlam:
                 else: 
                     self.grid.add_value_along_line_offset(pose[0], pose[1], x[i], y[i], -0.95, val_wall=0, offset=5)
             else:
-                self.grid.add_value_along_line(pose[0], pose[1], x[i], y[i], -0.95)
+                self.grid.add_value_along_line_offset(pose[0], pose[1], x[i], y[i], -0.95, val_wall=-0.95, offset = 2)
 
         if not self.gaussian:
             self.grid.add_map_points(x[idx], y[idx], 6)
