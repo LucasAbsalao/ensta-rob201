@@ -8,11 +8,14 @@ from occupancy_grid import OccupancyGrid
 class TinySlam:
     """Simple occupancy grid SLAM"""
 
-    def __init__(self, occupancy_grid: OccupancyGrid):
+    def __init__(self, occupancy_grid: OccupancyGrid, gaussian_b: bool):
         self.grid = occupancy_grid
 
         # Origin of the odom frame in the map frame
         self.odom_pose_ref = np.array([0, 0, 0])
+
+        self.gaussian = gaussian_b
+
 
     def _score(self, lidar, pose):
         """
@@ -116,24 +119,6 @@ class TinySlam:
             
         return best_score
 
-        # new_angles = np.random.normal(0, np.pi/8, iterations)
-        # new_x = np.random.normal(0,2.0,iterations)
-        # new_y = np.random.normal(0,2.0,iterations)
-
-        # positions_to_test = np.repeat([self.odom_pose_ref], iterations, axis=0)
-        # positions_to_test[:,0] += new_x
-        # positions_to_test[:,1] += new_y
-        # positions_to_test[:,2] += new_angles
-
-        # corrected_poses = self.get_corrected_pose(corrected_raw_pose, positions_to_test)
-        # new_score = [self._score(lidar, pose) for pose in corrected_poses]
-
-        # if np.max(new_score) > best_score:
-        #     idx_max_score = np.argmax(new_score)
-        #     self.odom_pose_ref = positions_to_test[idx_max_score]
-        #     return new_score[idx_max_score]
-
-        # return best_score
 
     def update_map(self, lidar, pose):
         """
@@ -167,13 +152,22 @@ class TinySlam:
 
         idx = distances<lidar.max_range
 
+        safe_distances = np.minimum(distances, lidar.max_range)
+
         x = np.cos(angles + pose[2]) * distances + pose[0]
         y = np.sin(angles + pose[2]) * distances + pose[1]
 
         for i in range(len(x)):
-            self.grid.add_value_along_line_offset(pose[0], pose[1], x[i], y[i], -0.95, 0, 3)
+            if idx[i]:
+                if self.gaussian:
+                    self.grid.add_value_along_line_gaussian(pose[0], pose[1], x[i], y[i], -0.95, val_wall=6, offset=2, sigma=0.5)
+                else: 
+                    self.grid.add_value_along_line_offset(pose[0], pose[1], x[i], y[i], -0.95, val_wall=0, offset=5)
+            else:
+                self.grid.add_value_along_line(pose[0], pose[1], x[i], y[i], -0.95)
 
-        self.grid.add_map_points(x[idx], y[idx], 6)
+        if not self.gaussian:
+            self.grid.add_map_points(x[idx], y[idx], 6)
 
         np.clip(self.grid.occupancy_map, -40, 40, out=self.grid.occupancy_map)
         

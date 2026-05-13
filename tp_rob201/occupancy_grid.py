@@ -116,7 +116,7 @@ class OccupancyGrid:
         # add value to the points
         self.occupancy_map[points[0], points[1]] += val
 
-    def add_value_along_line_offset(self, x_0: float, y_0: float, x_1: float, y_1: float, val, val_wall:float, offset:int = 5, mean: float=0, sigma: float = 0.1):
+    def add_value_along_line_offset(self, x_0: float, y_0: float, x_1: float, y_1: float, val, val_wall:float, offset:int = 5):
         """
         Add a value to a line of points using Bresenham algorithm, input in world coordinates
         x_0, y_0 : starting point coordinates in m
@@ -175,6 +175,77 @@ class OccupancyGrid:
             self.occupancy_map[points[0,-offset:], points[1,-offset:]] += val_wall
         else:
             self.occupancy_map[points[0], points[1]] += val
+
+
+
+    def add_value_along_line_gaussian(self, x_0: float, y_0: float, x_1: float, y_1: float, val, val_wall:float, offset:int = 5, sigma: float = 2.0):
+        """
+        Add a value to a line of points using Bresenham algorithm, input in world coordinates
+        x_0, y_0 : starting point coordinates in m
+        x_1, y_1 : end point coordinates in m
+        val : value to add to each cell of the line
+        """
+
+        # convert to pixel
+        x_start, y_start = self.conv_world_to_map(x_0, y_0)
+        x_hit, y_hit = self.conv_world_to_map(x_1, y_1)
+
+        angle = np.arctan2(y_hit - y_start, x_hit - x_start)
+        x_end = int(np.round(x_hit + offset * np.cos(angle)))
+        y_end = int(np.round(y_hit + offset * np.sin(angle)))
+
+        if x_start < 0 or x_start >= self.x_max_map or y_start < 0 or y_start >= self.y_max_map:
+            return
+
+        if x_end < 0 or x_end >= self.x_max_map or y_end < 0 or y_end >= self.y_max_map:
+            return
+        check=False
+        # Bresenham line drawing
+        d_x = x_end - x_start
+        d_y = y_end - y_start
+        is_steep = abs(d_y) > abs(d_x)  # determine how steep the line is
+        if is_steep:  # rotate line
+            x_start, y_start = y_start, x_start
+            x_end, y_end = y_end, x_end
+        # swap start and end points if necessary and store swap state
+        if x_start > x_end:
+            x_start, x_end = x_end, x_start
+            y_start, y_end = y_end, y_start
+            check=True
+        d_x = x_end - x_start  # recalculate differentials
+        d_y = y_end - y_start  # recalculate differentials
+        error = int(d_x / 2.0)  # calculate error
+        y_step = 1 if y_start < y_end else -1
+        # iterate over bounding box generating points between start and end
+        y = y_start
+        points = []
+        for x in range(x_start, x_end + 1):
+            coord = [y, x] if is_steep else [x, y]
+            points.append(coord)
+            error -= abs(d_y)
+            if error < 0:
+                y += y_step
+                error += d_x
+        points = np.array(points).T
+
+        px = points[0]
+        py = points[1]
+
+        if check:
+            px = px[::-1]
+            py = py[::-1]
+
+        dist_to_hit = np.sqrt((px - x_hit)**2 + (py - y_hit)**2)
+        updates = np.zeros(len(px))
+        tail_size = (offset * 2) + 1
+
+        if len(px) > tail_size:
+            updates[:-tail_size] = val
+            updates[-tail_size:] = val_wall * np.exp(-0.5 * (dist_to_hit[-tail_size:] / sigma)**2)
+        else:
+            # Case in which the robot is very close to the wall
+            updates[:] = val_wall * np.exp(-0.5 * (dist_to_hit[:] / sigma)**2)
+        self.occupancy_map[px, py] += updates
             
 
     def add_map_points(self, points_x, points_y, val):

@@ -28,7 +28,8 @@ if __name__ == '__main__':
     use_shaders = True
 
     my_robot = MyRobotSlam(lidar_params=lidar_params,
-                           odometer_params=odometer_params)
+                           odometer_params=odometer_params,
+                           gaussian_modele_probabiliste=True)
     my_world = MyWorld(robot=my_robot, use_shaders=use_shaders)
     simulator = Simulator(the_world=my_world,
                           use_keyboard=False)
