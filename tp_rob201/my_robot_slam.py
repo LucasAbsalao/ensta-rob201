@@ -171,7 +171,7 @@ class MyRobotSlam(RobotAbstract):
                     command = potential_field_control(lidar=self.lidar(), current_pose=pose, goal_pose=next_target, d_safe=self.d_safe/3)
 
             else:
-                # Se não tem plano ou a lista já acabou, fica totalmente parado
+                # Stop after findind the initial position
                 command = {"forward": 0.0, "rotation": 0.0}
 
         if self.plan is not None:
