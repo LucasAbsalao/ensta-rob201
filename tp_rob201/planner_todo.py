@@ -39,7 +39,7 @@ class Planner:
                     if i==0 and j == 0:
                         continue
 
-                    if(self.grid.occupancy_map[nx][ny] == 0):
+                    if(self.grid.occupancy_map[nx][ny] <= 0):
                         neighbor_list.append((nx, ny))
         return neighbor_list
 

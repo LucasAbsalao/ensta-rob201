@@ -59,7 +59,7 @@ class MyRobotSlam(RobotAbstract):
         self.d_safe = 30.0
 
         #Goal
-        self.goal = np.array([-50,-500,0])
+        self.goal = [20,20,0]
         self.goal_count = 0
 
     def control(self):
@@ -69,6 +69,14 @@ class MyRobotSlam(RobotAbstract):
         pose = self.odometer_values()
 
         if self.exploring:
+            #Starting
+            if self.counter < 30:
+                self.tiny_slam.update_map_offset(self.lidar(), pose)
+                if self.counter == 29:
+                    self.goal = self.new_goal()
+                self.counter+=1
+                return {"forward": 0, "rotation": 0}
+            
             if self.counter>=30:
                 score = self.tiny_slam.localise(self.lidar(), pose)
                 #print("Score: ", score)
